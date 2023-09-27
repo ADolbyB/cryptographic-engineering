@@ -169,22 +169,36 @@ void comba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
 void karatsuba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     int i, j;
 
-    //initialize arrays
-    uint64_t ma[8];
+    uint64_t ma[8];                                     // initialize arrays
     uint64_t mb[8];
     uint64_t z0[16] = { 0 };
     uint64_t z1[16] = { 0 };
     uint64_t z2[16] = { 0 };
 
     // 3d:
-    // Compute ma, mb
+    for(i = 0; i < 8; i++) {                            // Compute ma, mb
+        ma[i] = a[i] + a[8 + i];
+        mb[i] = b[i] + b[8 + i];
+    }
 
-    // Compute z0, z1, z2
+    for(i = 0; i < 8; i++) {                            // Compute z0, z1, z2
+        for(j = 0; j < 8; j++) {
+            z0[i + j] += a[i] * b[j];
+            z1[i + j] += ma[i] * mb[j];
+            z2[i + j] += a[i + 8] * b[j + 8];
+        }
+    }
 
-    // Perform subtraction z1 = z1 - z0 - z2
+    for(i = 0; i < 15; i++) {                           // Perform subtraction z1 = z1 - z0 - z2
+        z1[i] = z1[i] - z0[i] - z2[i];
+    }
 
-    // Implement final addition and put the result in r
-
+    for(i = 0; i < 8; i++) {                            // Implement final addition and put the result in r
+        r[i] = z0[i];
+        r[i + 8] = z1[i] + z0[i + 8];
+        r[i + 16] = z2[i] + z1[i + 8];
+        r[i + 24] = z2[i + 8];
+    }
 }
 
 int main() {

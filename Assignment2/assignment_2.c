@@ -26,7 +26,7 @@ const bigint256 b_exp  = {
 };
 
 /* SageMath Code 1(a)
-r = Integer(a_exp, base=2^16) + Integer(b_exp, base=2^16)       # Needs SageMath
+r = Integer(a_exp, base=2^16) + Integer(b_exp, base=2^16)
 
 print(f' a_exp + b_exp = {hex(r)}\n')   
 
@@ -38,7 +38,7 @@ Output: a_exp + b_exp = 0x8da0,0x52b2,0xac4b,0xaf29,0x9671,0x511e,0x7e37,0x0fe9,
 
 // Update the sum here
 const bigint256 add_exp = { 
-    0x8da0,0x52b2,0xac4b,0xaf29,0x9671,0x511e,0x7e37,0x0fe9,        // checked accurate w/ TA
+    0x8da0,0x52b2,0xac4b,0xaf29,0x9671,0x511e,0x7e37,0x0fe9,
     0xc887,0x8ad5,0x452f,0x7126,0x38e1,0x06c3,0xc5db,0x179f
 }; 
 
@@ -57,7 +57,7 @@ Output b_exp - a_exp =: '0x664a,0x574e,0x07e7,0x2bc2,0x32d0,0x404f,0x5487,0x0de5
 
 // Update the difference here
 const bigint256 sub_exp = { 
-    0x99b6,0xa8b1,0xf818,0xd43d,0xcd2f,0xbfb0,0xab78,0xf21a,        // checked accurate w/ TA
+    0x99b6,0xa8b1,0xf818,0xd43d,0xcd2f,0xbfb0,0xab78,0xf21a,
     0xf0aa,0xe540,0x85e4,0x13cc,0xfe4e,0xfedf,0xeea4,0x8e55
 };
 
@@ -109,10 +109,10 @@ void add256(bigint256 r, const bigint256 a, const bigint256 b) {
     uint8_t carry = 0;
 
     // 1B:
-    for(i = 0; i < 16; i++) {               // Break bigint256 into 16 indices of 16 bits each
-        r[i] = a[i] + b[i] + carry;         // calculate sum
-        carry = r[i] >> 16;                 // shift right to preserve carry bit
-        r[i] &= 0xFFFF;                     // mask the result to 8 bits
+    for(i = 0; i < 16; i++) {                       // Break bigint256 into 16 indices of 16 bits each
+        r[i] = a[i] + b[i] + carry;                 // calculate sum
+        carry = r[i] >> 16;                         // shift right to preserve carry bit
+        r[i] &= 0xFFFF;                             // mask the result to 8 bits
     }
 }
 
@@ -122,10 +122,10 @@ void sub256(bigint256 r, const bigint256 a, const bigint256 b) {
     uint8_t borrow = 0;
 
     // 2b:
-    for(i = 0; i < 16; i++) {               // Break bigint256 into 16 indices of 16 bits each
-        r[i] = a[i] - b[i] - borrow;        // calculate sum
-        borrow = r[i] >> 63;                // shift right to preserve carry bit
-        r[i] &= 0xFFFF;                     // mask the result to 16 bits
+    for(i = 0; i < 16; i++) {                       // Break bigint256 into 16 indices of 16 bits each
+        r[i] = a[i] - b[i] - borrow;                // calculate sum
+        borrow = r[i] >> 63;                        // shift right to preserve carry bit
+        r[i] &= 0xFFFF;                             // mask the result to 16 bits
     }
 }
 
@@ -133,11 +133,11 @@ void sub256(bigint256 r, const bigint256 a, const bigint256 b) {
 void schoolbook_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     int i, j;
 
-    memset(r, 0, 256);                      // Initialize r with 0s
+    memset(r, 0, 256);                              // Initialize r with 0s
 
-    for(i = 0; i < 16; i++) {               // 16 total indices in the bigint256 array
-        for(j = 0; j < 16; j++) {           // 16 total multiplications
-            r[i + j] += a[i] * b[j];
+    for(i = 0; i < 16; i++) {                       // 16 total indices in the bigint256 array
+        for(j = 0; j < 16; j++) {                   // 16 total multiplications
+            r[i + j] += a[i] * b[j];                // Add multiplication products to the result
         }
     }
 }
@@ -150,17 +150,15 @@ void comba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     for(i = 0; i < 16; i++) {               // 1st loop 0 - 15 indices
         r[i] = 0;
         for(j = 0; j <= i; j++) {
-            r[i] += b[i - j] * a[j];        // what happens when i > j and b[i - j] is negative?
+            r[i] += b[i - j] * a[j];        // i - j is never negative: j <= i
         }
     }
 
     // 2nd For Loop: 16 to 31 indices
-    for(i = 0; i < 16; i++) {
-        r[16 + i] += (a[i] >> 31) & 0xFFFFFFFFF;        // Mask & add to carry bits only
-        for(j = 0; j < 16; j++) {
-            r[16 + j] += (b[j] >> 31) & 0xFFFFFFFF;     // Mask & add carry bits
-            //r[16 + j] += (b[j] >> 31) & 0xFFFFFFFF;
-            //r[16 + j] += (r[16 + j - 1] >> 32) & 0xFFFFFFFF;         // propagate carries: anything over 32 bits
+    for(i = 16; i < 32; i++) {
+        r[i] = 0;                           
+        for(j = (i - 15); j < 16; j++) {
+            r[i] += b[i - j] * a[j];
         }
     }
 }

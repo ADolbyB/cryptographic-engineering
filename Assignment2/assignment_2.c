@@ -26,19 +26,40 @@ const bigint256 b_exp  = {
 };
 
 /* SageMath Code 1(a)
+r = Integer(a_exp, base=2^16) + Integer(b_exp, base=2^16)       # Needs SageMath
 
+print(f' a_exp + b_exp = {hex(r)}\n')   
+
+','.join(["0x{0:0{1}x}".format(x, 4) for x in r.digits(base=2^16, padto=16)])
+
+Output Concatenated:  a_exp + b_exp = 0x1179fc5db06c338e17126452f8ad5c8870fe97e37511e9671af29ac4b52b28da0
+Output: a_exp + b_exp = 0x8da0,0x52b2,0xac4b,0xaf29,0x9671,0x511e,0x7e37,0x0fe9,0xc887,0x8ad5,0x452f,0x7126,0x38e1,0x06c3,0xc5db,0x179f,0x0001
 */
 
 // Update the sum here
-const bigint256 add_exp = {0};
-
+const bigint256 add_exp = { 
+    0x8da0,0x52b2,0xac4b,0xaf29,0x9671,0x511e,0x7e37,0x0fe9,        // checked accurate w/ TA
+    0xc887,0x8ad5,0x452f,0x7126,0x38e1,0x06c3,0xc5db,0x179f
+}; 
 
 /* SageMath Code 2(a)
+a = 0x13abfdb2d231c1b3b1d0086714d801025c99380b658ac2799b9702d1da4052fa
+r_exp = Integer(b_exp, base=2^16) - Integer(a_exp, base=2^16)
+
+print(f' b_exp - a_exp = {hex(r_exp)}\n')
+
+','.join(["0x{0:0{1}x}".format(x, 4) for x in r_exp.digits(base=2^16, padto=16)])
+
+Output Concatenated: 0x71aa115b012001b1ec337a1b1abf0f550de55487404f32d02bc207e7574e664a
+Output b_exp - a_exp =: '0x664a,0x574e,0x07e7,0x2bc2,0x32d0,0x404f,0x5487,0x0de5,0x0f55,0x1abf,0x7a1b,0xec33,0x01b1,0x0120,0x115b,0x71aa'
 
 */
 
 // Update the difference here
-const bigint256 sub_exp = {0};
+const bigint256 sub_exp = { 
+    0x99b6,0xa8b1,0xf818,0xd43d,0xcd2f,0xbfb0,0xab78,0xf21a,        // checked accurate w/ TA
+    0xf0aa,0xe540,0x85e4,0x13cc,0xfe4e,0xfedf,0xeea4,0x8e55
+};
 
 const bigint512 mul_exp = { 
     0x0095ea5a7,0x07f63b45a,0x0c91ff598,0x18c71e6d8,0x244fa7f13,0x28f2eba45,0x263bdd778,0x205bef01a,
@@ -64,7 +85,7 @@ void bigint256_print(const bigint256 a) {
     printf("0x%04"PRIx64"}",a[i]);
 }
 
-//print 512 bit number (Helper)
+// Print 512 bit number (Helper)
 void bigint512_print(const bigint512 a) {
     int i;
     printf("{");
@@ -87,8 +108,12 @@ void add256(bigint256 r, const bigint256 a, const bigint256 b) {
     int i;
     uint8_t carry = 0;
 
-    // 1b:
-
+    // 1B:
+    for(i = 0; i < 16; i++) {               // Break bigint256 into 16 indices of 16 bits each
+        r[i] = a[i] + b[i] + carry;         // calculate sum
+        carry = r[i] >> 16;                 // shift right to preserve carry bit
+        r[i] &= 0xFFFF;                     // mask the result to 8 bits
+    }
 }
 
 // r = a - b
@@ -97,7 +122,11 @@ void sub256(bigint256 r, const bigint256 a, const bigint256 b) {
     uint8_t borrow = 0;
 
     // 2b:
-
+    for(i = 0; i < 16; i++) {               // Break bigint256 into 16 indices of 16 bits each
+        r[i] = a[i] - b[i] - borrow;        // calculate sum
+        borrow = r[i] >> 63;                // shift right to preserve carry bit
+        r[i] &= 0xFFFF;                     // mask the result to 16 bits
+    }
 }
 
 // r = a * b using schoolbook method
@@ -105,16 +134,35 @@ void schoolbook_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     int i, j;
 
     memset(r, 0, 256);                      // Initialize r with 0s
-    // 3b:
-    
+
+    for(i = 0; i < 16; i++) {               // 16 total indices in the bigint256 array
+        for(j = 0; j < 16; j++) {           // 16 total multiplications
+            r[i + j] += a[i] * b[j];
+        }
+    }
 }
 
 // r = a * b using comba method
 void comba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
-    int i, j;
+    int i, j;                               // a & b have 16 indices * 16 bits each = 256 bits total
 
-    // 3c:
+    // 3c:                                  // each index can hold 64 bits (but we keep 16)
+    for(i = 0; i < 16; i++) {               // 1st loop 0 - 15 indices
+        r[i] = 0;
+        for(j = 0; j <= i; j++) {
+            r[i] += b[i - j] * a[j];        // what happens when i > j and b[i - j] is negative?
+        }
+    }
 
+    // 2nd For Loop: 16 to 31 indices
+    for(i = 0; i < 16; i++) {
+        r[16 + i] += (a[i] >> 31) & 0xFFFFFFFFF;        // Mask & add to carry bits only
+        for(j = 0; j < 16; j++) {
+            r[16 + j] += (b[j] >> 31) & 0xFFFFFFFF;     // Mask & add carry bits
+            //r[16 + j] += (b[j] >> 31) & 0xFFFFFFFF;
+            //r[16 + j] += (r[16 + j - 1] >> 32) & 0xFFFFFFFF;         // propagate carries: anything over 32 bits
+        }
+    }
 }
 
 // r = a * b using Karatsuba method
@@ -124,9 +172,9 @@ void karatsuba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     //initialize arrays
     uint64_t ma[8];
     uint64_t mb[8];
-    uint64_t z0[16] = {0};
-    uint64_t z1[16] = {0};
-    uint64_t z2[16] = {0};
+    uint64_t z0[16] = { 0 };
+    uint64_t z1[16] = { 0 };
+    uint64_t z2[16] = { 0 };
 
     // 3d:
     // Compute ma, mb

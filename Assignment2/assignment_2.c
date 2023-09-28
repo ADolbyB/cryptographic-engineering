@@ -2,6 +2,7 @@
  * Joel Brigida: Z23521884
  * CDA4321: Cryptographic Engineering
  * Dr. Reza Azarderaksh
+ * Assignment #2
  * Sept 13, 2023
 */
 
@@ -26,13 +27,14 @@ const bigint256 b_exp  = {
 };
 
 /* SageMath Code 1(a)
+
 r = Integer(a_exp, base=2^16) + Integer(b_exp, base=2^16)
 
 print(f' a_exp + b_exp = {hex(r)}\n')   
 
 ','.join(["0x{0:0{1}x}".format(x, 4) for x in r.digits(base=2^16, padto=16)])
 
-Output Concatenated:  a_exp + b_exp = 0x1179fc5db06c338e17126452f8ad5c8870fe97e37511e9671af29ac4b52b28da0
+Output Concatenated: 0x1179fc5db06c338e17126452f8ad5c8870fe97e37511e9671af29ac4b52b28da0
 Output: a_exp + b_exp = 0x8da0,0x52b2,0xac4b,0xaf29,0x9671,0x511e,0x7e37,0x0fe9,0xc887,0x8ad5,0x452f,0x7126,0x38e1,0x06c3,0xc5db,0x179f,0x0001
 */
 
@@ -43,6 +45,7 @@ const bigint256 add_exp = {
 }; 
 
 /* SageMath Code 2(a)
+
 a = 0x13abfdb2d231c1b3b1d0086714d801025c99380b658ac2799b9702d1da4052fa
 r_exp = Integer(b_exp, base=2^16) - Integer(a_exp, base=2^16)
 
@@ -110,9 +113,9 @@ void add256(bigint256 r, const bigint256 a, const bigint256 b) {
 
     // 1B:
     for(i = 0; i < 16; i++) {                       // Break bigint256 into 16 indices of 16 bits each
-        r[i] = a[i] + b[i] + carry;                 // calculate sum
-        carry = r[i] >> 16;                         // shift right to preserve carry bit
-        r[i] &= 0xFFFF;                             // mask the result to 8 bits
+        r[i] = a[i] + b[i] + carry;                 // calculate sum of each pair of indices and carry
+        carry = r[i] >> 16;                         // shift right to preserve MSB carry bit
+        r[i] &= 0xFFFF;                             // mask the result to the 16 bit index
     }
 }
 
@@ -123,15 +126,15 @@ void sub256(bigint256 r, const bigint256 a, const bigint256 b) {
 
     // 2b:
     for(i = 0; i < 16; i++) {                       // Break bigint256 into 16 indices of 16 bits each
-        r[i] = a[i] - b[i] - borrow;                // calculate sum
-        borrow = r[i] >> 63;                        // shift right to preserve carry bit
-        r[i] &= 0xFFFF;                             // mask the result to 16 bits
+        r[i] = a[i] - b[i] - borrow;                // calculate difference with borrow
+        borrow = r[i] >> 63;                        // shift right to preserve MSB borrow bit
+        r[i] &= 0xFFFF;                             // mask the result to the 16 bit index
     }
 }
 
 // r = a * b using schoolbook method
 void schoolbook_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
-    int i, j;
+    int i, j;                                       // i corresponds to a[i] & r[i], j corresponds to b[j]
 
     memset(r, 0, 256);                              // Initialize r with 0s
 
@@ -144,21 +147,20 @@ void schoolbook_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
 
 // r = a * b using comba method
 void comba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
-    int i, j;                               // a & b have 16 indices * 16 bits each = 256 bits total
+    int i, j;                                       // i corresponds to b[i] & r[i], j corresponds to a[j]
 
-    // 3c:                                  // each index can hold 64 bits (but we keep 16)
-    for(i = 0; i < 16; i++) {               // 1st loop 0 - 15 indices
-        r[i] = 0;
-        for(j = 0; j <= i; j++) {
-            r[i] += b[i - j] * a[j];        // i - j is never negative: j <= i
+    // 3c:                                          // each index can hold 64 bits (but we keep 16)
+    for(i = 0; i < 16; i++) {                       // 1st loop: 1st half of calculations: indices 0 - 15
+        r[i] = 0;                                   // Zero current index
+        for(j = 0; j <= i; j++) {                   // i - j is never negative: j <= i
+            r[i] += b[i - j] * a[j];                // Add each multiplication result to the current index
         }
     }
 
-    // 2nd For Loop: 16 to 31 indices
-    for(i = 16; i < 32; i++) {
-        r[i] = 0;                           
-        for(j = (i - 15); j < 16; j++) {
-            r[i] += b[i - j] * a[j];
+    for(i = 16; i < 32; i++) {                      // 2nd Loop: 2nd half of calculations: indices 16 to 31
+        r[i] = 0;                                   // Zero current index.
+        for(j = (i - 15); j < 16; j++) {            // j starts at 1, since a[j] never exceeds 16
+            r[i] += b[i - j] * a[j];                // Add each multiplication result to the current index
         }
     }
 }
@@ -167,19 +169,19 @@ void comba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
 void karatsuba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     int i, j;
 
-    uint64_t ma[8];                                     // initialize arrays
+    uint64_t ma[8];                                 // initialize arrays
     uint64_t mb[8];
     uint64_t z0[16] = { 0 };
     uint64_t z1[16] = { 0 };
     uint64_t z2[16] = { 0 };
 
     // 3d:
-    for(i = 0; i < 8; i++) {                            // Compute ma, mb
+    for(i = 0; i < 8; i++) {                        // Compute ma, mb
         ma[i] = a[i] + a[8 + i];
         mb[i] = b[i] + b[8 + i];
     }
 
-    for(i = 0; i < 8; i++) {                            // Compute z0, z1, z2
+    for(i = 0; i < 8; i++) {                        // Compute z0, z1, z2
         for(j = 0; j < 8; j++) {
             z0[i + j] += a[i] * b[j];
             z1[i + j] += ma[i] * mb[j];
@@ -187,11 +189,11 @@ void karatsuba_mul256(bigint512 r, const bigint256 a, const bigint256 b) {
         }
     }
 
-    for(i = 0; i < 15; i++) {                           // Perform subtraction z1 = z1 - z0 - z2
+    for(i = 0; i < 15; i++) {                       // Perform subtraction z1 = z1 - z0 - z2
         z1[i] = z1[i] - z0[i] - z2[i];
     }
 
-    for(i = 0; i < 8; i++) {                            // Implement final addition and put the result in r
+    for(i = 0; i < 8; i++) {                        // Implement final addition and put the result in r
         r[i] = z0[i];
         r[i + 8] = z1[i] + z0[i + 8];
         r[i + 16] = z2[i] + z1[i + 8];
@@ -266,7 +268,7 @@ int main() {
     bigint256 b_rand;
     bigint512 c_rand;
     unsigned long long cycles, cycles1, cycles2;
-    FILE *urandom = fopen("/dev/urandom","r");  //for random input
+    FILE *urandom = fopen("/dev/urandom","r");      // for random input
 
     printf("###############################\n");
     printf("Exercise 4:\n");

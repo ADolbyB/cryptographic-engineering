@@ -56,7 +56,7 @@ uint64_t modb(uint64_t a) {                     // a = 2^30 - 18 = Number to be 
     return r;
 }
 
-// a^-1 mod p1 using FLT                        // a^(p1 - 2) == a^(-1) mod p
+// a^-1 mod p1 using FLT                        // a^(p - 2) == a^(-1) mod p
 uint64_t FLT(uint64_t a) {                      // a = 51
     const uint64_t p1 = 0x0001FFFF;             // p1 = 2^17 - 1 = 0x1ffff = 131071 in decimal
     int i;

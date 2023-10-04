@@ -56,9 +56,9 @@
 typedef uint64_t bigint256[16]; //for operands
 typedef uint64_t bigint512[32]; //for multiplication result
 
-const bigint256 PRIME = {
-    0xffed,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,
-    0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0x7fff
+const bigint256 PRIME = {       // Value: 2^255 - 19
+    0xffed, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff,
+    0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0x7fff
 };
 
 // Print 256 bit number (Helper)
@@ -93,7 +93,12 @@ void mod_add(bigint256 r, const bigint256 a, const bigint256 b) {
     int i;
     uint64_t carry, mask;
 
-    // Write 1 here
+    // Write 1 here:                    // Modular addition
+    ADD_LOOP(a, b, r);                  // r could be > p or < p
+    SUB_LOOP(r, PRIME, r);              // We have -p < r < p
+    mask = 0 - (r[15] >> 63);           // highest bit = 1 if the result is negative. Mask is either 0x000.. or all 0xFFF...
+    ADD_MASK_LOOP(r, mask, PRIME, r);   // Finally we have (a + b) mod p
+
 }
 
 // r = (a - b) % PRIME

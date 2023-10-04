@@ -107,12 +107,13 @@ void mod_sub(bigint256 r, const bigint256 a, const bigint256 b) {
     uint64_t carry, mask;
 
     // Write 2 here
+    SUB_LOOP(a, b, r);
+    // recording: 6:57pm 10/4/2023
 }
 
 void mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     int i, j;
-    // Initialize r with 0s
-    memset(r, 0, 256);
+    memset(r, 0, 256);              // Initialize r with 0s
 
     for(i = 0; i < 16; i++) {
         for(j = 0; j < 16; j++) {
@@ -123,10 +124,23 @@ void mul256(bigint512 r, const bigint256 a, const bigint256 b) {
 
 // r = a % PRIME using pseudo mersenne reduction
 void psu_reduce(bigint256 r, const bigint512 a) {
-    int i;
+    int i;                              // only for the Macros
     uint64_t carry, mask;
 
     // Write 3 here
+    // Need to reduce a 512bit number (32 x 32bit) to a 256bit (16 x 32bit) result.
+    ADD_MUL_DIGIT_LOOP(a, &a[16], 38, r);    // array a: &a[16] = a + 16 = a[16] : 1st element of high bits.
+    // Now we have reduced by 2p: al + ah * 38
+
+    // Perform another Pseudo Mersenne reduction by 2^255 - 19
+    // al + ah * 19
+    r[0] = r[0] + 19; //* (???);               // Need the 256+ bit of r
+    r[15] = r[15] & 0xFFFF;                 // Mask with 2^15 - 1 = 0xFFFF
+
+    CARRY_PROP_LOOP(r, r);
+    
+    // Same problem as MOD_ADD() and MOD_SUB()
+    // Need to subtract p &choose based on MASK.
 }
 
 void mod_mul(bigint256 r, const bigint256 a, const bigint256 b) {
@@ -151,6 +165,20 @@ void mod_inv(bigint256 r, const bigint256 a) {
     memcpy(t, a, sizeof(bigint256));
 
     // Write 4 here.
+    // Fermat's Little Theorem: a^(-1) mod p == a^(p - 2)
+    // p - 2 = (2^255 - 19) - 2
+    // Therefore, p - 2 has 249 1's (need to square and multiply 249 times)
+    for(i = 0; i < 249; i++) {
+        // Something Here... use mod_sqr()
+        // Something Here... use mod_mul()
+    }
+
+    // Now need to process the final bits in the string: 01011
+    // 0: only square operation
+    // 1: square and multiply
+    // 0: only square operation
+    // 1: square and multiply
+    // 1: square and multiply
 
 }
 

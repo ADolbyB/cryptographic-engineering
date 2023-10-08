@@ -1,9 +1,9 @@
 /**
  * Joel Brigida
  * CDA-4321: Cryptographic Engineering
- * Assignment 3: 
+ * Assignment 3: Efficient Reduction Operations
+ * Due: 10/8/2023
 */
-
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -169,7 +169,7 @@ void mod_inv(bigint256 r, const bigint256 a) {
 
     // p = PRIME = (2^255 - 19), so p - 2 = (2^255 - 19) - 2
     // p - 2 has 249 1's followed by 01011: (need to square and multiply 249 times)
-    for(i = 0; i < 249; i++) {
+    for(i = 0; i < 249; i++) {              // Process all the 1's First
         mod_sqr(t, t);                      // Square THEN multiply (order matters)
         mod_mul(t, t, a);
     }

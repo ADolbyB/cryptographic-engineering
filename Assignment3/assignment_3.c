@@ -1,3 +1,10 @@
+/**
+ * Joel Brigida
+ * CDA-4321: Cryptographic Engineering
+ * Assignment 3: 
+*/
+
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,10 +60,10 @@
     }                                                   \
     (r)[i]  = (a)[i] + ((b)[i] * (c0)) + carry
 
-typedef uint64_t bigint256[16]; //for operands
-typedef uint64_t bigint512[32]; //for multiplication result
+typedef uint64_t bigint256[16];             // for operands
+typedef uint64_t bigint512[32];             // for multiplication result
 
-const bigint256 PRIME = {       // Value: 2^255 - 19
+const bigint256 PRIME = {                   // Value: 2^255 - 19
     0xffed, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff,
     0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0x7fff
 };
@@ -70,7 +77,7 @@ void bigint256_print(const bigint256 a) {
     printf("0x%04lx}",a[i]);
 }
 
-//print 512 bit number (Helper)
+// Print 512 bit number (Helper)
 void bigint512_print(const bigint512 a) {
     int i;
     printf("{");
@@ -91,31 +98,31 @@ void bigint512_print(const bigint512 a) {
 // r = (a + b) % PRIME
 void mod_add(bigint256 r, const bigint256 a, const bigint256 b) {
     int i;
-    uint64_t carry, mask;
+    uint64_t carry, mask;                   // Used in Preprocessor Directives
 
-    // Write 1 here:                    // Modular addition
-    ADD_LOOP(a, b, r);                  // r could be > p or < p
-    SUB_LOOP(r, PRIME, r);              // We have -p < r < p
-    mask = 0 - (r[15] >> 63);           // highest bit = 1 if the result is negative. Mask is either 0x000.. or all 0xFFF...
-    ADD_MASK_LOOP(r, mask, PRIME, r);   // Finally we have (a + b) mod p
+    ADD_LOOP(a, b, r);                      // r could be > p or < p
+    SUB_LOOP(r, PRIME, r);                  // We have -p < r < p
+    mask = 0 - (r[15] >> 63);               // highest bit = 1 if the result is negative. Mask is either 0x000.. or all 0xFFF...
+    ADD_MASK_LOOP(r, mask, PRIME, r);       // Finally we have (a + b) mod p
 
 }
 
 // r = (a - b) % PRIME
 void mod_sub(bigint256 r, const bigint256 a, const bigint256 b) {
     int i;
-    uint64_t carry, mask;
+    uint64_t carry, mask;                   // Used in Preprocessor Directives
 
-    // Write 2 here
-    SUB_LOOP(a, b, r);
-    // recording: 6:57pm 10/4/2023
+    SUB_LOOP(a, b, r);                      // Modular subtraction
+    mask = 0 - (r[15] >> 63);               // Mask Here
+    ADD_MASK_LOOP(r, mask, PRIME, r);       // 'conditional' add
+
 }
 
 void mul256(bigint512 r, const bigint256 a, const bigint256 b) {
     int i, j;
-    memset(r, 0, 256);              // Initialize r with 0s
+    memset(r, 0, 256);                      // Initialize r with 0s
 
-    for(i = 0; i < 16; i++) {
+    for(i = 0; i < 16; i++) {               // Schoolbook multiplication
         for(j = 0; j < 16; j++) {
             r[i + j] += a[j] * b[i];
         }
@@ -124,23 +131,22 @@ void mul256(bigint512 r, const bigint256 a, const bigint256 b) {
 
 // r = a % PRIME using pseudo mersenne reduction
 void psu_reduce(bigint256 r, const bigint512 a) {
-    int i;                              // only for the Macros
-    uint64_t carry, mask;
+    int i;
+    uint64_t carry, mask;                   // Used in Preprocessor Directives
 
-    // Write 3 here
     // Need to reduce a 512bit number (32 x 32bit) to a 256bit (16 x 32bit) result.
-    ADD_MUL_DIGIT_LOOP(a, &a[16], 38, r);    // array a: &a[16] = a + 16 = a[16] : 1st element of high bits.
+    ADD_MUL_DIGIT_LOOP(a, &a[16], 38, r);   // array a: &a[16] = a + 16 = a[16] : 1st element of high bits.
     // Now we have reduced by 2p: al + ah * 38
 
-    // Perform another Pseudo Mersenne reduction by 2^255 - 19
-    // al + ah * 19
-    r[0] = r[0] + 19; //* (???);               // Need the 256+ bit of r
-    r[15] = r[15] & 0xFFFF;                 // Mask with 2^15 - 1 = 0xFFFF
+    // Perform another Pseudo Mersenne reduction by PRIME = 2^255 - 19
+    r[0] += 19 * (r[15] >> 0xf);            // al + ah * 19: Need the 256+ bits of r
+    r[15] = r[15] & 0x7FFF;                 // Mask with 2^15 - 1 = 0x7FFF (drops carry bit)
+    CARRY_PROP_LOOP(r, r);                  // Propagate the carry
 
-    CARRY_PROP_LOOP(r, r);
-    
-    // Same problem as MOD_ADD() and MOD_SUB()
-    // Need to subtract p &choose based on MASK.
+    // Same problem as MOD_ADD() and MOD_SUB(): subtract p & choose based on MASK.
+    SUB_LOOP(r, PRIME, r);
+    mask = 0 - (r[15] >> 63);               // Mask Here
+    ADD_MASK_LOOP(r, mask, PRIME, r);       // 'conditional' add
 }
 
 void mod_mul(bigint256 r, const bigint256 a, const bigint256 b) {
@@ -158,28 +164,28 @@ void mod_sqr(bigint256 r, const bigint256 a) {
 // r = (a^-1) % PRIME using pseudo mersenne reduction
 void mod_inv(bigint256 r, const bigint256 a) {
     int i;
-    bigint256 t;
-
-    // Do NOT write into r until the very end. Otherwise, if you pass mod_inv(b, b) for example, 
-    // it will output incorrect result. Use t as temporary variable.
+    bigint256 t;                            // Temp value for 'r'
     memcpy(t, a, sizeof(bigint256));
 
-    // Write 4 here.
-    // Fermat's Little Theorem: a^(-1) mod p == a^(p - 2)
-    // p - 2 = (2^255 - 19) - 2
-    // Therefore, p - 2 has 249 1's (need to square and multiply 249 times)
+    // p = PRIME = (2^255 - 19), so p - 2 = (2^255 - 19) - 2
+    // p - 2 has 249 1's followed by 01011: (need to square and multiply 249 times)
     for(i = 0; i < 249; i++) {
-        // Something Here... use mod_sqr()
-        // Something Here... use mod_mul()
+        mod_sqr(t, t);                      // Square THEN multiply (order matters)
+        mod_mul(t, t, a);
     }
 
-    // Now need to process the final bits in the string: 01011
-    // 0: only square operation
-    // 1: square and multiply
-    // 0: only square operation
-    // 1: square and multiply
-    // 1: square and multiply
+    // Process the final bits in the string: 01011
+    mod_sqr(t, t);                          // 0: only square operation
+    mod_sqr(t, t);                          // 1: square and multiply
+    mod_mul(t, t, a);
+    mod_sqr(t, t);                          // 0: only square operation
+    mod_sqr(t, t);                          // 1: square and multiply
+    mod_mul(t, t, a);
+    mod_sqr(t, t);                          // 1: square and multiply
+    mod_mul(t, t, a);                       // Alternate: mod_mul(r, t, a); and we can skip the next memcpy() line
 
+    // Only write to r at the very end, else improper result
+    memcpy(r, t, sizeof(bigint256));
 }
 
 int main() {
@@ -187,11 +193,11 @@ int main() {
     int i, pass;
     bigint256 a;
     bigint256 b;
-    bigint512 c;    // for mult
-    bigint256 exp1; // for add
-    bigint256 exp2; // for sub
-    bigint256 exp3; // for psu-reduce
-    bigint256 exp4; // for inv
+    bigint512 c;                            // for mult
+    bigint256 exp1;                         // for add
+    bigint256 exp2;                         // for sub
+    bigint256 exp3;                         // for psu-reduce
+    bigint256 exp4;                         // for inv
     bigint256 act;
 
     FILE *fbank = fopen("assignment_3_bank","r");

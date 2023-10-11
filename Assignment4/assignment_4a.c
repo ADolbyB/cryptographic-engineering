@@ -22,19 +22,22 @@
 FILE *fbank;
 
 #if REAL_RANDOM
-#define RANDOM_DATA(ptr, size) \
-FILE *frandom = fopen("/dev/urandom", "r"); \
-fread((ptr), (size), 1, frandom); \
-fclose(frandom);
+    #define RANDOM_DATA(ptr, size) \
+    FILE *frandom = fopen("/dev/urandom", "r"); \
+    fread((ptr), (size), 1, frandom); \
+    fclose(frandom);
 #else
-#define RANDOM_DATA(ptr, size) \
-fread((ptr), (size), 1, fbank);
+    #define RANDOM_DATA(ptr, size) \
+    fread((ptr), (size), 1, fbank);
 #endif // REAL_RANDOM
 
-typedef uint64_t bigint256[16]; //for operands
-typedef uint64_t bigint512[32]; //for multiplication result
+typedef uint64_t bigint256[16]; // for operands
+typedef uint64_t bigint512[32]; // for multiplication result
 
-const bigint256 PRIME          = {0xffed,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0x7fff};
+const bigint256 PRIME = {
+    0xffed,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,
+    0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0x7fff
+};
 
 // Print 256 bit number as 1 hex integer (Helper)
 void print_hex256(const char *s, const bigint256 a) {
@@ -61,7 +64,7 @@ int read_hex256(const char *s, const char* a, bigint256 r) {
         -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
     };
     
-    int i,j;
+    int i, j;
     uint8_t c;
     long hex_value;
     
@@ -72,7 +75,7 @@ int read_hex256(const char *s, const char* a, bigint256 r) {
 
     memset(r, 0, sizeof(bigint256));
 
-    for(i = 15; i>=0; i--) {
+    for(i = 15; i >= 0; i--) {
         for (j = 3; j >= 0; j--) {
             c = *a++;
             hex_value = hextable[c];
@@ -133,9 +136,9 @@ void mul(bigint512 r, const bigint256 a, const bigint256 b) {
     // Compute z0, z1, z2
     for(i = 0; i < 8; i++) {
         for(j = 0; j < 8; j++) {
-            z0[i+j] += a[i] * b[j];
-            z1[i+j] += ma[i] * mb[j];
-            z2[i+j] += a[8+i] * b[8+j];
+            z0[i + j] += a[i] * b[j];
+            z1[i + j] += ma[i] * mb[j];
+            z2[i + j] += a[8 + i] * b[8 + j];
         }
     }
 
@@ -146,9 +149,9 @@ void mul(bigint512 r, const bigint256 a, const bigint256 b) {
     // Implement final addition and put the result in r
     for(i = 0; i < 8; i++) {
         r[i] = z0[i];
-        r[8+i] = z0[8+i] + z1[i];
-        r[16+i] = z1[8+i] + z2[i];
-        r[24+i] = z2[8+i];
+        r[8 + i] = z0[8 + i] + z1[i];
+        r[16 + i] = z1[8 + i] + z2[i];
+        r[24 + i] = z2[8 + i];
     }
 }
 
@@ -161,14 +164,14 @@ void psu_reduce(bigint256 r, const bigint512 a) {
     // a[0-15] + 38*a[16-31]
     carry = 0;
     for(i = 0; i < 15; i++) {
-        r[i] = a[i] + 38*a[16+i] + carry;
+        r[i] = a[i] + 38 * a[16+i] + carry;
         carry = r[i] >> 16;
         r[i] &= 0xffff;
     }
-    r[i] = a[i] + 38*a[16+i] + carry;
+    r[i] = a[i] + 38 * a[16 + i] + carry;
 
     // Second round of pseudo-mersenne 
-    r[0] = r[0] + 19*(r[15]>>15);
+    r[0] = r[0] + 19 * (r[15] >> 15);
     r[15] &= 0x7fff; // Remove the high bits.
 
     // Perform carry propagation
@@ -182,7 +185,7 @@ void psu_reduce(bigint256 r, const bigint512 a) {
 
     // r = r mod p
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = r[i]- PRIME[i] - carry;
         carry = r[i] >> 63;
         r[i] &= 0xffff;
@@ -192,7 +195,7 @@ void psu_reduce(bigint256 r, const bigint512 a) {
     mask = 0 - (r[15] >> 63);
 
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = r[i] + (mask & PRIME[i]) + carry;
         carry = r[i] >> 16;
         r[i] &= 0xffff;
@@ -214,27 +217,67 @@ void mod_sqr(bigint256 r, const bigint256 a){
 
 // If option == 1, then r = b. If option == 0 then r = a.
 void select_bigint256(bigint256 r, const bigint256 a, const bigint256 b, uint8_t option) {
-    int i;
-    uint64_t t;
+    int i;                      // for() loop
+    uint64_t t;                 // Temp variable
     uint64_t mask;
 
     // Write 1 here
+    // A value is square, B value is square and multiply
+    // 1) create a mask. From what?? use the 'option'
+    mask = 0 - option;          // mask is either 0 or 1. if 0, then 0 - option = 11111.... = -1
+
+    for(i = 0; i < 16; i++) {
+        t = a[i] ^ b[i];        // a[i] XOR b[i]
+        t = mask & t;           // mask temp variable
+        r[i] = a[i] ^ t;        // write to r[i]
+    }
+    // Hint 1: Use XOR ('^' in C)
+    // Recall that (a ^ b) ^ a = b and (a ^ b) ^ b = a
+
+    // Hint 2: Remember that our inputs a, b are 256-bit numbers & radix 16.
+    // Remember to process EACH digit of a and b
+    // Is this right: t = a ^ b ? NO, use a for() loop
+
+    // Hint 3: given t = a ^ b, need to determine which to keep
+    // must use the mask with some other logical operation. against a ^ b for each digit.
+    
+    // Hint 4: 0 ^ a = a, 0 ^ b = b. The 0 is very important! What might this correspond to?
 
 }
 
 // r = a^e mod p
 void mod_exp(bigint256 r, const bigint256 a, const bigint256 e) {
-    int i, j;
+    int i, j;               // one nested for() loop. one not a nested for() loop
     uint8_t bit;
 	bigint256 t, t2;
 
+    // Square and multiply: Similar to Assignment 3
+    // for() loop uses 'i--'
+
     // Write 2 here. Do not write into r until the very end.
+    memcpy(t, a, sizeof(bigint256));        // Start Here FIRST
+
+    // 256-bit numbers: We only process 253 bits.
+    // For the MSB in index 15, we only care about 14/16 bits.
+    // All other indices, we are processing all 16 bits. (Use different logic here)
+    // process A: Index 15: Start with bit 14, which is the special case.
+    // process B: Indices 0 - 14: start at bit 15
+    // need to capture each bit of 'e', and at some point send that to 'select_bigint256'
+    // Use shift & mask technique
+
+    // both processes: Always square and multiply
+    // we have temp variables for a reason!!
+    // finally, you need to copy the final value from the temp variable to r
+
 }
 
 // Generate secret key and public key.
 void keyGen(bigint256 sk, bigint256 pk) {
     // Generator
-    const bigint256 g= {0x4855,0xafb3,0xe21b,0x24a6,0x98f0,0x02cd,0xff08,0xaaa1,0x379a,0x461e,0x08ea,0xc8e8,0xa1dd,0x2cd7,0x1d71,0x4f62};
+    const bigint256 g = {
+        0x4855,0xafb3,0xe21b,0x24a6,0x98f0,0x02cd,0xff08,0xaaa1,
+        0x379a,0x461e,0x08ea,0xc8e8,0xa1dd,0x2cd7,0x1d71,0x4f62
+    };
     int i;
     
     // Write 3 here
@@ -243,7 +286,15 @@ void keyGen(bigint256 sk, bigint256 pk) {
 
     
     // Generate public key here
+    // Hint 1: Need to generate 3 masks: 
+    // 1 to CLEAR bits 0, 1, 2 = 0xFFF8
+    // 1 to CLEAR bit 255 = ??
+    // 1 to SET bit 254 = ??
 
+    // Hint 2: RANDOM_DATA() fills each index of 'sk' with 64 bits. This is NOT what we want.
+    // We only need 16 bits. Get rid of the rest (shift & mask)
+
+    // Finally, compute pk = g^sk mod PRIME
 
 }
 
@@ -252,6 +303,7 @@ void sharedSecret(bigint256 ss, const bigint256 sk, const bigint256 pk) {
     // Write 4 here
     // Compute shared secret here
 
+    // No hints, READ PRELAB and the ASSIGNMENT!!
 
 }
 

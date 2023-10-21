@@ -302,17 +302,16 @@ void keyGen(bigint256 sk, bigint256 pk) {
         sk[i] &= 0xFFFF;                        // Mask sk[1] to sk[14] to 16 bits
     }
 
-    // Generate public key here: compute pk = g^sk mod PRIME
+    // Generate public key here: compute pk = g^{sk} mod PRIME
     mod_exp(pk, g, sk);
 
 }
 
 // Generate shared secret from the secret key & other party's public key
 void sharedSecret(bigint256 ss, const bigint256 sk, const bigint256 pk) {
-    // Write 4 here
-    // Compute shared secret here
 
-    // No hints, READ PRELAB and the ASSIGNMENT!!
+    // Compute shared secret: ss = pk^{sk} mod PRIME
+    mod_exp(ss, pk, sk);
 
 }
 

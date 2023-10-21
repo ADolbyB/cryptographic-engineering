@@ -3,6 +3,13 @@
  * CDA-4321: Cryptographic Engineering
  * Assignment 4
  * Due 10/22/2023
+ * 
+ * To debug & enable all warnings at compilation time:
+ * `gcc -g -Wall -Werror assignment_4a.c -o assignment_4a`
+ * 
+ * To set output to radix-16 (e.g. for `info locals` command)
+ * `set output-radix 16`
+ * 
 */
 
 #include <errno.h>
@@ -35,8 +42,8 @@ typedef uint64_t bigint256[16]; // for operands
 typedef uint64_t bigint512[32]; // for multiplication result
 
 const bigint256 PRIME = {
-    0xffed,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,
-    0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0xffff,0x7fff
+    0xffed, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff,
+    0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0x7fff
 };
 
 // Print 256 bit number as 1 hex integer (Helper)
@@ -44,7 +51,7 @@ void print_hex256(const char *s, const bigint256 a) {
     int i;
     printf("%s", s);
     for(i = 15; i >= 0; i--)
-        printf("%04lx",a[i]);
+        printf("%04lx", a[i]);
     printf("\n");
 }
 
@@ -94,8 +101,8 @@ void bigint256_print(const bigint256 a) {
     int i;
     printf("{");
     for(i = 0; i < 15; i++)
-        printf("0x%04lx,",a[i]);
-    printf("0x%04lx}",a[i]);
+        printf("0x%04lx,", a[i]);
+    printf("0x%04lx}", a[i]);
 }
 
 //print 512 bit number (Helper)
@@ -129,8 +136,8 @@ void mul(bigint512 r, const bigint256 a, const bigint256 b) {
 
     // Compute ma, mb
     for(i = 0; i < 8; i++) {
-        ma[i] = a[i] + a[8+i];
-        mb[i] = b[i] + b[8+i];
+        ma[i] = a[i] + a[8 + i];
+        mb[i] = b[i] + b[8 + i];
     }
 
     // Compute z0, z1, z2
@@ -143,7 +150,7 @@ void mul(bigint512 r, const bigint256 a, const bigint256 b) {
     }
 
     // Perform subtraction z1 = z1 - z0 - z2
-    for(i = 0; i < 15; i++) // z0[15],z1[15],z2[15] are 0
+    for(i = 0; i < 15; i++) // z0[15], z1[15], z2[15] are 0
         z1[i] = z1[i] - z0[i] - z2[i];
 
     // Implement final addition and put the result in r
@@ -161,10 +168,10 @@ void psu_reduce(bigint256 r, const bigint512 a) {
     uint64_t carry, mask;
 
     // First round of pseudo-mersenne with carry propagation
-    // a[0-15] + 38*a[16-31]
+    // a[0 - 15] + 38 * a[16 - 31]
     carry = 0;
     for(i = 0; i < 15; i++) {
-        r[i] = a[i] + 38 * a[16+i] + carry;
+        r[i] = a[i] + 38 * a[16 + i] + carry;
         carry = r[i] >> 16;
         r[i] &= 0xffff;
     }
@@ -217,19 +224,19 @@ void mod_sqr(bigint256 r, const bigint256 a){
 
 // If option == 1, then r = b. If option == 0 then r = a.
 void select_bigint256(bigint256 r, const bigint256 a, const bigint256 b, uint8_t option) {
-    int i;                      // for() loop
-    uint64_t t;                 // Temp variable
+    int i;                                      // for() loop
+    uint64_t t;                                 // Temp variable
     uint64_t mask;
 
     // Write 1 here
     // A value is square, B value is square and multiply
     // 1) create a mask. From what?? use the 'option'
-    mask = 0 - option;          // mask is either 0 or 1. if 0, then 0 - option = 11111.... = -1
+    mask = 0 - option;                          // mask is either 0 or 1. if 0, then 0 - option = 11111.... = -1
 
     for(i = 0; i < 16; i++) {
-        t = a[i] ^ b[i];        // a[i] XOR b[i]
-        t = mask & t;           // mask temp variable
-        r[i] = a[i] ^ t;        // write to r[i]
+        t = a[i] ^ b[i];                        // a[i] XOR b[i]
+        t = mask & t;                           // mask temp variable
+        r[i] = a[i] ^ t;                        // write to r[i]
     }
     // Hint 1: Use XOR ('^' in C)
     // Recall that (a ^ b) ^ a = b and (a ^ b) ^ b = a
@@ -247,15 +254,37 @@ void select_bigint256(bigint256 r, const bigint256 a, const bigint256 b, uint8_t
 
 // r = a^e mod p
 void mod_exp(bigint256 r, const bigint256 a, const bigint256 e) {
-    int i, j;               // one nested for() loop. one not a nested for() loop
-    uint8_t bit;
-	bigint256 t, t2;
+    int i, j;                                   // one nested for() loop. one not a nested for() loop
+    uint8_t bit;                                // bit becomes the option
+	bigint256 t, t2;                            // temp variables
 
     // Square and multiply: Similar to Assignment 3
     // for() loop uses 'i--'
 
     // Write 2 here. Do not write into r until the very end.
-    memcpy(t, a, sizeof(bigint256));        // Start Here FIRST
+    memcpy(t, a, sizeof(bigint256));            // Start Here FIRST
+
+    // For index 15 only: need to set the MSB (bit 255) to 1.
+    // need to mask first, then start the loop
+    // t[15] |= 0x0001;                         // Set MSB to 1
+    // for(i = 1; i < 16; i++) {
+    //     bit = t[15] >> i;                    // get the option to send to the select function
+    //     bit &= 0x1;                          // make bit a single bit
+    //     select_bigint256(t[15], a[15], e[15], bit);
+    // }
+
+    // for(i = 0; i < 15; i++) {                // For index 0 - 14
+    //     for(j = 16; j >= 0; j--) {
+
+    //     }
+    // }
+
+    for(i = 253; i>= 0; i--) {
+        bit = (e[i >> 4] >> (i & 0xF)) & 1;     // extract a bit from e
+        mod_sqr(t, t);
+        mod_mul(t2, t, a);
+        select_bigint256(t, t, t2, bit);
+    }
 
     // 256-bit numbers: We only process 253 bits.
     // For the MSB in index 15, we only care about 14/16 bits.
@@ -268,28 +297,24 @@ void mod_exp(bigint256 r, const bigint256 a, const bigint256 e) {
     // both processes: Always square and multiply
     // we have temp variables for a reason!!
     // finally, you need to copy the final value from the temp variable to r
+    memcpy(r, t, sizeof(bigint256));
 
 }
 
 // Generate secret key and public key.
 void keyGen(bigint256 sk, bigint256 pk) {
-    // Generator
-    const bigint256 g = {
-        0x4855,0xafb3,0xe21b,0x24a6,0x98f0,0x02cd,0xff08,0xaaa1,
-        0x379a,0x461e,0x08ea,0xc8e8,0xa1dd,0x2cd7,0x1d71,0x4f62
+    const bigint256 g = {                       // Generator
+        0x4855, 0xafb3, 0xe21b, 0x24a6, 0x98f0, 0x02cd, 0xff08, 0xaaa1,
+        0x379a, 0x461e, 0x08ea, 0xc8e8, 0xa1dd, 0x2cd7, 0x1d71, 0x4f62
     };
     int i;
-    
-    // Write 3 here
-    // Generate secret key here (first line is given to you)
-    RANDOM_DATA(sk, sizeof(bigint256));  // This will read from the file once and fill sk with random data.
 
-    
+    // Generate (random) secret key here
+    RANDOM_DATA(sk, sizeof(bigint256));         // reads from the file & fills sk w/ random data.
+
     // Generate public key here
     // Hint 1: Need to generate 3 masks: 
-    // 1 to CLEAR bits 0, 1, 2 = 0xFFF8
-    // 1 to CLEAR bit 255 = ??
-    // 1 to SET bit 254 = ??
+
 
     // Hint 2: RANDOM_DATA() fills each index of 'sk' with 64 bits. This is NOT what we want.
     // We only need 16 bits. Get rid of the rest (shift & mask)

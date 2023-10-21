@@ -241,40 +241,40 @@ void select_bigint256(bigint256 r, const bigint256 a, const bigint256 b, uint8_t
 // r = a^e mod p
 void mod_exp(bigint256 r, const bigint256 a, const bigint256 e) {
     int i, j;                                   // one nested for() loop. one not a nested for() loop
-    uint8_t bit;                                // bit becomes the option
+    uint8_t bit;                                // bit becomes the 'option'
 	bigint256 t, t2;                            // temp variables
 
-    memcpy(t, a, sizeof(bigint256));            // Start Here FIRST
+    memcpy(t, a, sizeof(bigint256));            // Copy a to temp variable
 
     // 256-bit numbers: We only process 253 bits.
     // For index 15 only: need to set the MSB (bit 255) to 1.
     // For the MSB in index 15, we only care about 14/16 bits.
-    // for(i = 13; i >= 0; i--) {                  // process bits 0 - 14
-    //     bit = e[15] >> i;                       // get the option to send to the select function
-    //     bit &= 0x1;                             // make bit a single bit
+    // for(i = 13; i >= 0; i--) {               // process bits 0 - 14
+    //     bit = e[15] >> i;                    // get the option to send to the select function
+    //     bit &= 0x1;                          // make bit a single bit
     //     mod_sqr(t, t);
     //     mod_mul(t2, t, a);
     //     select_bigint256(t, t, t2, bit);
     // }
 
     // All other indices, we are processing all 16 bits.
-    // for(i = 14; i >= 0; i--) {                  // For index 0 - 14
-    //     for(j = 15; j >= 0; j--) {              // Inner loop cycles through each bit in index
-    //         bit = e[i] >> j;                    // get the option to send to the select function
-    //         bit &= 0x1;                         // make bit a single bit
+    // for(i = 14; i >= 0; i--) {               // For index 0 - 14
+    //     for(j = 15; j >= 0; j--) {           // Inner loop cycles through each bit in index
+    //         bit = e[i] >> j;                 // get the option to send to the select function
+    //         bit &= 0x1;                      // make bit a single bit
     //         mod_sqr(t, t);
     //         mod_mul(t2, t, a);
     //         select_bigint256(t, t, t2, bit);
     //     }
     // }
 
-    // Optimized Solution:
-    for(i = 253; i >= 0; i--) {                 // 'i' is 8 bits
+    // Optimized Solution: process 253 bits in a single loop
+    for(i = 253; i >= 0; i--) {                 // 'i' is 8 bits: upper 4 is array index, lower 4 = bits in index
         bit = e[i >> 4] >> (i & 0xF);           // e[i >> 4]: upper 8 bits of i = array index 0 - 15
         bit &= 0x1;                             // (i & 0xF): lower bits of i = 16 total values: number of bits to shift.
         mod_sqr(t, t);                          // & 0x1 grabs a single bit of 'e'
-        mod_mul(t2, t, a);
-        select_bigint256(t, t, t2, bit);        // Square and multiply, then send to select function
+        mod_mul(t2, t, a);                      // Square and multiply
+        select_bigint256(t, t, t2, bit);        // Send to select function
     }
 
     memcpy(r, t, sizeof(bigint256));
@@ -292,8 +292,8 @@ void keyGen(bigint256 sk, bigint256 pk) {
     // Generate (random) secret key here
     RANDOM_DATA(sk, sizeof(bigint256));         // reads from the file & fills sk w/ random data.
 
-    // Generate public key here
-    // Hint 1: Need to generate 3 masks: 
+    // RANDOM_DATA() fills each index of 'sk' with 64 bits. Need to mask to 16 bits only
+    // Generate 3 masks: 
     sk[0] &= 0xFFF8;                            // CLEAR bits 0, 1, 2: & w/ 0xFFF8
     sk[15] |= 0x4000;                           // SET bit 254: | w/ 0x4000
     sk[15] &= 0x7FFF;                           // CLEAR bit 255: & w/ 0x7FFF
@@ -301,17 +301,13 @@ void keyGen(bigint256 sk, bigint256 pk) {
     for(i = 1; i < 15; i++) {
         sk[i] &= 0xFFFF;                        // Mask sk[1] to sk[14] to 16 bits
     }
-    
+
+    // Generate public key here: compute pk = g^sk mod PRIME
     mod_exp(pk, g, sk);
-
-    // Hint 2: RANDOM_DATA() fills each index of 'sk' with 64 bits. This is NOT what we want.
-    // We only need 16 bits. Get rid of the rest (shift & mask)
-
-    // Finally, compute pk = g^sk mod PRIME
 
 }
 
-// Generate shared secret from your secret key and other party's public key
+// Generate shared secret from the secret key & other party's public key
 void sharedSecret(bigint256 ss, const bigint256 sk, const bigint256 pk) {
     // Write 4 here
     // Compute shared secret here

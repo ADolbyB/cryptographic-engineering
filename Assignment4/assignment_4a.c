@@ -228,9 +228,6 @@ void select_bigint256(bigint256 r, const bigint256 a, const bigint256 b, uint8_t
     uint64_t t;                                 // Temp variable
     uint64_t mask;
 
-    // Write 1 here
-    // A value is square, B value is square and multiply
-    // 1) create a mask. From what?? use the 'option'
     mask = 0 - option;                          // mask is either 0 or 1. if 0, then 0 - option = 11111.... = -1
 
     for(i = 0; i < 16; i++) {
@@ -238,17 +235,6 @@ void select_bigint256(bigint256 r, const bigint256 a, const bigint256 b, uint8_t
         t = mask & t;                           // mask temp variable
         r[i] = a[i] ^ t;                        // write to r[i]
     }
-    // Hint 1: Use XOR ('^' in C)
-    // Recall that (a ^ b) ^ a = b and (a ^ b) ^ b = a
-
-    // Hint 2: Remember that our inputs a, b are 256-bit numbers & radix 16.
-    // Remember to process EACH digit of a and b
-    // Is this right: t = a ^ b ? NO, use a for() loop
-
-    // Hint 3: given t = a ^ b, need to determine which to keep
-    // must use the mask with some other logical operation. against a ^ b for each digit.
-    
-    // Hint 4: 0 ^ a = a, 0 ^ b = b. The 0 is very important! What might this correspond to?
 
 }
 
@@ -258,45 +244,20 @@ void mod_exp(bigint256 r, const bigint256 a, const bigint256 e) {
     uint8_t bit;                                // bit becomes the option
 	bigint256 t, t2;                            // temp variables
 
-    // Square and multiply: Similar to Assignment 3
-    // for() loop uses 'i--'
-
-    // Write 2 here. Do not write into r until the very end.
     memcpy(t, a, sizeof(bigint256));            // Start Here FIRST
 
+    // 256-bit numbers: We only process 253 bits.
     // For index 15 only: need to set the MSB (bit 255) to 1.
-    // need to mask first, then start the loop
-    // t[15] |= 0x0001;                         // Set MSB to 1
-    // for(i = 1; i < 16; i++) {
-    //     bit = t[15] >> i;                    // get the option to send to the select function
-    //     bit &= 0x1;                          // make bit a single bit
-    //     select_bigint256(t[15], a[15], e[15], bit);
-    // }
+    // For the MSB in index 15, we only care about 14/16 bits.
 
-    // for(i = 0; i < 15; i++) {                // For index 0 - 14
-    //     for(j = 16; j >= 0; j--) {
-
-    //     }
-    // }
-
-    for(i = 253; i>= 0; i--) {
-        bit = (e[i >> 4] >> (i & 0xF)) & 1;     // extract a bit from e
-        mod_sqr(t, t);
+    for(i = 253; i >= 0; i--) {                 // 'i' is 8 bits
+        bit = e[i >> 4] >> (i & 0xF);           // e[i >> 4]: upper 8 bits of i = array index 0 - 15
+        bit &= 0x1;                             // (i & 0xF): lower bits of i = 16 total values: number of bits to shift.
+        mod_sqr(t, t);                          // & 0x1 grabs a single bit of 'e'
         mod_mul(t2, t, a);
-        select_bigint256(t, t, t2, bit);
+        select_bigint256(t, t, t2, bit);        // Square and multiply, then send to select function
     }
 
-    // 256-bit numbers: We only process 253 bits.
-    // For the MSB in index 15, we only care about 14/16 bits.
-    // All other indices, we are processing all 16 bits. (Use different logic here)
-    // process A: Index 15: Start with bit 14, which is the special case.
-    // process B: Indices 0 - 14: start at bit 15
-    // need to capture each bit of 'e', and at some point send that to 'select_bigint256'
-    // Use shift & mask technique
-
-    // both processes: Always square and multiply
-    // we have temp variables for a reason!!
-    // finally, you need to copy the final value from the temp variable to r
     memcpy(r, t, sizeof(bigint256));
 
 }
@@ -315,8 +276,8 @@ void keyGen(bigint256 sk, bigint256 pk) {
     // Generate public key here
     // Hint 1: Need to generate 3 masks: 
     sk[0] &= 0xFFF8;                            // CLEAR bits 0, 1, 2: & w/ 0xFFF8
-    sk[15] |= 0x4000;                           // SET bit 254: | w/ 0x0002
-    sk[15] &= 0x7FFF;                           // CLEAR bit 255: & w/ 0xFFFE
+    sk[15] |= 0x4000;                           // SET bit 254: | w/ 0x4000
+    sk[15] &= 0x7FFF;                           // CLEAR bit 255: & w/ 0x7FFF
     for(i = 1; i < 15; i++) {
         sk[i] &= 0xFFFF;                        // Mask sk[1] to sk[14] to 16 bits
     }

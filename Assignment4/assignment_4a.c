@@ -249,13 +249,23 @@ void mod_exp(bigint256 r, const bigint256 a, const bigint256 e) {
     // 256-bit numbers: We only process 253 bits.
     // For index 15 only: need to set the MSB (bit 255) to 1.
     // For the MSB in index 15, we only care about 14/16 bits.
-
-    for(i = 253; i >= 0; i--) {                 // 'i' is 8 bits
-        bit = e[i >> 4] >> (i & 0xF);           // e[i >> 4]: upper 8 bits of i = array index 0 - 15
-        bit &= 0x1;                             // (i & 0xF): lower bits of i = 16 total values: number of bits to shift.
-        mod_sqr(t, t);                          // & 0x1 grabs a single bit of 'e'
+    for(i = 13; i >= 0; i--) {                  // process bits 0 - 14
+        bit = e[15] >> i;                       // get the option to send to the select function
+        bit &= 0x1;                             // make bit a single bit
+        mod_sqr(t, t);
         mod_mul(t2, t, a);
-        select_bigint256(t, t, t2, bit);        // Square and multiply, then send to select function
+        select_bigint256(t, t, t2, bit);
+    }
+
+    // All other indices, we are processing all 16 bits.
+    for(i = 14; i >= 0; i--) {                  // For index 0 - 14
+        for(j = 15; j >= 0; j--) {              // Inner loop cycles through each bit in index
+            bit = e[i] >> j;                    // get the option to send to the select function
+            bit &= 0x1;                         // make bit a single bit
+            mod_sqr(t, t);
+            mod_mul(t2, t, a);
+            select_bigint256(t, t, t2, bit);
+        }
     }
 
     memcpy(r, t, sizeof(bigint256));
@@ -278,6 +288,7 @@ void keyGen(bigint256 sk, bigint256 pk) {
     sk[0] &= 0xFFF8;                            // CLEAR bits 0, 1, 2: & w/ 0xFFF8
     sk[15] |= 0x4000;                           // SET bit 254: | w/ 0x4000
     sk[15] &= 0x7FFF;                           // CLEAR bit 255: & w/ 0x7FFF
+    
     for(i = 1; i < 15; i++) {
         sk[i] &= 0xFFFF;                        // Mask sk[1] to sk[14] to 16 bits
     }

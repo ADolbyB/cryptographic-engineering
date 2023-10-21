@@ -314,7 +314,14 @@ void keyGen(bigint256 sk, bigint256 pk) {
 
     // Generate public key here
     // Hint 1: Need to generate 3 masks: 
-
+    sk[0] &= 0xFFF8;                            // CLEAR bits 0, 1, 2: & w/ 0xFFF8
+    sk[15] |= 0x4000;                           // SET bit 254: | w/ 0x0002
+    sk[15] &= 0x7FFF;                           // CLEAR bit 255: & w/ 0xFFFE
+    for(i = 1; i < 15; i++) {
+        sk[i] &= 0xFFFF;                        // Mask sk[1] to sk[14] to 16 bits
+    }
+    
+    mod_exp(pk, g, sk);
 
     // Hint 2: RANDOM_DATA() fills each index of 'sk' with 64 bits. This is NOT what we want.
     // We only need 16 bits. Get rid of the rest (shift & mask)

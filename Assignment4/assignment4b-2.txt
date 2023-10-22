@@ -1,0 +1,50 @@
+<< Code output from terminal >>
+Assignment 4B part 2: Diffie-Hellman
+
+# 4B-2A) Generate sk/pk pair and shared secret:
+
+change '#define REAL_RANDOM 0' to '#define REAL_RANDOM 1' in 'assignment_4a.c'
+
+Generate Compiled Binary: gcc assignment_4a.c -o 4a
+
+Generate  sk/pk pair: ./4a keygen
+sk = 7fa68d7da4f573a9054e13e0abf0f86cea1d25a6958038a8c1dd01c246f29d00
+pk = 737d09d4466dd9c5cf679aeff56e5c31b9f43151d961a687d829f97dcc5dafe0
+
+Generate Shared Secret Key:
+./4a shared 7fa68d7da4f573a9054e13e0abf0f86cea1d25a6958038a8c1dd01c246f29d00 
+737d09d4466dd9c5cf679aeff56e5c31b9f43151d961a687d829f97dcc5dafe0 | tee assignment4b-2.txt
+
+Output:
+sk = 7fa68d7da4f573a9054e13e0abf0f86cea1d25a6958038a8c1dd01c246f29d00
+pk = 737d09d4466dd9c5cf679aeff56e5c31b9f43151d961a687d829f97dcc5dafe0
+ss = 576e9bb7a2fb562698f45e17db36eaf3da6abffb27b0a13e7f51e84ca684b35f
+
+# 4B-2B)
+Generate the shared secret with command './4a shared <sk> <pk>' using given public key:
+pk = 388769a0326458d0fe3bdeac7f8f76ca610b2b364433d04fea4b41bfb5af5f32
+and the secret key generated in part 2a:
+sk = 7fa68d7da4f573a9054e13e0abf0f86cea1d25a6958038a8c1dd01c246f29d00
+
+Generate Shared Secret Key:
+./4a shared 7fa68d7da4f573a9054e13e0abf0f86cea1d25a6958038a8c1dd01c246f29d00 
+388769a0326458d0fe3bdeac7f8f76ca610b2b364433d04fea4b41bfb5af5f32 | tee -a assignment4b-2.txt 
+sk = 7fa68d7da4f573a9054e13e0abf0f86cea1d25a6958038a8c1dd01c246f29d00
+pk = 388769a0326458d0fe3bdeac7f8f76ca610b2b364433d04fea4b41bfb5af5f32
+ss = 1cafee73a700a7f19280a169da43fa60ae1d731ed2869f69a75134cbc5db60ed
+
+# 4B-2C)
+What is the approximate security level of this implementation?
+
+The secret key 'sk' and public key 'pk' have 64 hex digits each , which equates to 
+(64 * 4) = 256 bit key length.
+Since this is a Diffie-Hellman implementation, according to the FIPS 140-2 PDF,
+for this implementation to have 128-bit security level, the public key 'pk' must have
+L = 3072 bits and the secret key 'sk' must have N = 256 bits.
+Therefore, this implementation for Problem 4B-2 using Diffie-Hellman is NOT secure.
+
+# 4B-2D)
+Is it possible for Bob to generate a shared secret at any time w/o Alice online?
+Yes. As long as Alice's public key is available and accessible, then Bob can generate 
+a shared secret using his own private key and Alice's public key. This will generate
+the shared secret key Bob needs even though Alice may not be online.

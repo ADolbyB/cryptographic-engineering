@@ -122,7 +122,7 @@ void bigint256_print(const bigint256 a) {
     printf("0x%04lx}",a[i]);
 }
 
-//print 512 bit number (Helper)
+// print 512 bit number (Helper)
 void bigint512_print(const bigint512 a) {
     int i;
     printf("{");
@@ -165,7 +165,7 @@ void mod_add(bigint256 r, const bigint256 a, const bigint256 b) {
 
     // r = a+b
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = a[i] + b[i] + carry;
         carry = r[i] >> 16;
         r[i] &= 0xffff;
@@ -174,7 +174,7 @@ void mod_add(bigint256 r, const bigint256 a, const bigint256 b) {
 
     // r = r - PRIME
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = r[i] - PRIME[i] - carry;
         carry = r[i] >> 63;
         r[i] &= 0xffff;
@@ -186,7 +186,7 @@ void mod_add(bigint256 r, const bigint256 a, const bigint256 b) {
 
     // r = r + (mask & PRIME)
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = r[i] + (mask & PRIME[i]) + carry;
         carry = r[i] >> 16;
         r[i] &= 0xffff;
@@ -202,7 +202,7 @@ void mod_sub(bigint256 r, const bigint256 a, const bigint256 b) {
 
     // r = a-b
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = a[i] - b[i] - carry;
         carry = r[i] >> 63;
         r[i] &= 0xffff;
@@ -214,7 +214,7 @@ void mod_sub(bigint256 r, const bigint256 a, const bigint256 b) {
 
     // r = r + (mask & PRIME)
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = r[i] + (mask & PRIME[i]) + carry;
         carry = r[i] >> 16;
         r[i] &= 0xffff;
@@ -279,7 +279,7 @@ void psu_reduce(bigint256 r, const bigint512 a) {
     r[i] = a[i] + 38*a[16+i] + carry;
 
     // Second round of pseudo-mersenne 
-    r[0] = r[0] + 19*(r[15]>>15);
+    r[0] = r[0] + 19*(r[15] >> 15);
     r[15] &= 0x7fff; // Remove the high bits.
 
     // Perform carry propagation
@@ -293,8 +293,8 @@ void psu_reduce(bigint256 r, const bigint512 a) {
 
     // r = r mod p
     carry = 0;
-    for(i=0; i<15; i++) {
-        r[i] = r[i]- PRIME[i] - carry;
+    for(i = 0; i < 15; i++) {
+        r[i] = r[i] - PRIME[i] - carry;
         carry = r[i] >> 63;
         r[i] &= 0xffff;
     }
@@ -303,7 +303,7 @@ void psu_reduce(bigint256 r, const bigint512 a) {
     mask = 0 - (r[15] >> 63);
 
     carry = 0;
-    for(i=0; i<15; i++) {
+    for(i = 0; i < 15; i++) {
         r[i] = r[i] + (mask & PRIME[i]) + carry;
         carry = r[i] >> 16;
         r[i] &= 0xffff;
@@ -311,19 +311,19 @@ void psu_reduce(bigint256 r, const bigint512 a) {
     r[i] = r[i] + (mask & PRIME[i]) + carry;
 }
 
-void mod_mul(bigint256 r, const bigint256 a, const bigint256 b){
+void mod_mul(bigint256 r, const bigint256 a, const bigint256 b) {
     bigint512 t;
     mul(t, a, b);
     psu_reduce(r, t);
 }
 
-void mod_sqr(bigint256 r, const bigint256 a){
+void mod_sqr(bigint256 r, const bigint256 a) {
     bigint512 t;
     mul(t, a, a);
     psu_reduce(r, t);
 }
 
-// r = (a^-1) % 2PRIME using pseudo mersenne reduction
+// r = (a^-1) % PRIME using pseudo mersenne reduction
 void mod_inv(bigint256 r, const bigint256 a) {
     int i;
     bigint256 t;
@@ -357,47 +357,65 @@ void mod_inv(bigint256 r, const bigint256 a) {
 // R = P + Q
 void point_add(point *R, const point *P, const point *Q) {
     bigint256 t;
-    bigint256 m, xR, yR;
+    bigint256 m, xR, yR;        // Can use these MORE than once (accumulators)
 
     // Note to access x and y coordinate of P and Q use P->x, P->y, Q->x, Q->y
-    
-    // Write 1 here
-    // slope m
 
+    // slope m = (y_Q - y_P) / (x_Q - x_P)
+    mod_sub(m, Q->y, P->y);     // m = y_Q - y_P
+    mod_sub(t, Q->x, P->x);     // t = x_Q - x_P
+    mod_inv(t, t);              // t = 1 / (x_Q - x_P)
+    mod_mul(m, m, t);           // m = m * t == (y_Q - y_P) / (x_Q - x_P)
 
-    // xR
+    // xR = m^2 - x_P - x_Q
+    mod_sqr(xR, m);             // x_R = perform m^2
+    mod_sub(xR, xR, P->x);      // x_R = m^2 - x_P
+    mod_sub(xR, xR, Q->x);      // x_R = m^2 - x_P - x_Q
 
+    // yR = m(x_P - x_R) - y_p
+    mod_sub(yR, P->x, xR);      // y_R = x_P - x_R
+    mod_mul(yR, m, yR);         // y_R = m * yR
+    mod_sub(yR, yR, P->y);      // y_R = y_R - y_P
 
-    // yR
-
-
-
-    //R = (xR,yR)
+    // R = (xR, yR)
     memcpy(R->x, xR, sizeof(bigint256));
     memcpy(R->y, yR, sizeof(bigint256));
 }
 
 // R = P + P
 void point_double(point *R, const point *P) {
-    const bigint256 a = {0xa144,0x4914,0xaa98,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0x2aaa};
+    const bigint256 a = { 
+        0xa144,0x4914,0xaa98,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,
+        0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0x2aaa };
     bigint256 t;
     bigint256 m, xR, yR;
 
     // Note to access x and y coordinate of P use P->x, P->y
-    
-    // Write 2 here
-    // slope m
 
-    // xR
+    // slope m = (3(x_P)^2 + a) / (2(y_P))
+    mod_sqr(t, P->x);                   // t = (x_P)^2
+    mod_add(m, t, t);                   // m = 2(x_P)^2
+    mod_add(m, t, m);                   // m = 3(x_P)^2
+    mod_add(m, m, a);                   // m = t + a = 3(x_P)^2 + a
+    mod_add(t, P->y, P->y);             // t = 2(y_P)
+    mod_inv(t, t);                      // t = 1 / (2(y_P))
+    mod_mul(m, m, t);                   // m = m * t == (3(x_P)^2 + a) / (2(y_P))
+    // mod_add() twice after squaring
 
-    // yR
+    // xR = m^2 - 2(x_P)
+    mod_sqr(xR, m);                     // xR = m^2
+    mod_sub(xR, xR, P->x);              // xR = m^2 - x_P
+    mod_sub(xR, xR, P->x);              // xR = m^2 - 2(x_P)
 
+    // yR = m(x_P - x_R) - y_P
+    mod_sub(yR, P->x, xR);              // yR = x_P - x_R
+    mod_mul(yR, m, yR);                 // yR = m * yR == m(x_P - x_R)
+    mod_sub(yR, yR, P->y);              // yR = yR - y_P = m(x_P - x_R) - y_P
 
-    // R = (xR,yR)
+    // R = (xR, yR)
     memcpy(R->x, xR, sizeof(bigint256));
     memcpy(R->y, yR, sizeof(bigint256));
 }
-
 
 // If option == 0, then R = P. If option == 1 then R = Q.
 void select_point(point *R, const point *P, const point *Q, uint8_t option) {
@@ -407,8 +425,22 @@ void select_point(point *R, const point *P, const point *Q, uint8_t option) {
 
     // Note to access x and y coordinate of P, Q and R use P->x, P->y, Q->x, Q->y, R->x, R->y
 
-    // Write 3 here
+    // mask = 0 - option;                          // mask is either 0 or 1. if 0, then 0 - option = 11111.... = -1
 
+    // for(i = 0; i < 16; i++) {
+    //     t = a[i] ^ b[i];                        // a[i] XOR b[i]
+    //     t = mask & t;                           // mask temp variable
+    //     r[i] = a[i] ^ t;                        // write to r[i]
+    // }
+
+    // for(i = 0; i < 16; i++) {
+    //     t = a[i] ^ b[i];                        // a[i] XOR b[i]
+    //     t = mask & t;                           // mask temp variable
+    //     r[i] = a[i] ^ t;                        // write to r[i]
+    // }
+    // Choosing between 2 POINTS (not 2 single values)...
+    // Each point has 2 coordinates...
+    // So whatever you did in assignment 4, do it twice!!
 
 }
 
@@ -417,42 +449,87 @@ void point_mul(bigint256 xR, const point *P, const bigint256 s) {
     int i, j;
     uint8_t bit;
 	point T, T2; // Use &T for pointer. Access coordinates using T.x and T.y
+    // Example: point_add(&T, &T, &T2); since the point is a local variable: send address to the function being called
 
     // Write 4 here
     // Implement using "Double-and-add technique" technique
+    // ONLY functions needed are point_add(), point_sub() and select_point()
+    memcpy(&T, P, sizeof(point));
+    
+    // Process A:
+    // First we process bits 0 - 13 in index 15
+    // Next we process bits 0 - 15 in indices 0 - 14
+    
+    // 256-bit numbers: We only process 253 bits.
+    // For index 15 only: need to set the MSB (bit 255) to 1.
+    // For the MSB in index 15, we only care about 14/16 bits.
+    for(i = 13; i >= 0; i--) {                  // process bits 0 - 14
+        bit = s[15] >> i;                       // get the option to send to the select function
+        bit &= 0x1;                             // make bit a single bit
+        point_double(&T, &T);                   // double P: T is accumulator
+        point_add(&T2, &T, P);                  // Add T to P
+        select_point(&T, &T, &T2, bit);         // select between T and T2 based on 'bit'
+    }
 
+    // All other indices, we are processing all 16 bits.
+    for(i = 14; i >= 0; i--) {                  // For index 0 - 14
+        for(j = 15; j >= 0; j--) {              // Inner loop cycles through each bit in index
+            bit = s[i] >> j;                    // get the option to send to the select function
+            bit &= 0x1;                         // make bit a single bit
+            point_double(&T, &T);
+            point_add(&T2, &T, P);
+            select_point(&T, &T, &T2, bit);
+        }
+    }
+
+    // Reference assignment3 `mod_exp()` with variable exponent. For() loops will be identical
+    memcpy(xR, T.x, sizeof(bigint256));
 
 }
 
-// Compute y from x for E:y^2=x^3+ax+b
+// Compute y from x for E: y^2 = x^3 + ax + b
 void recover_y(bigint256 y, const bigint256 x) {
-    const bigint256 a = {0xa144,0x4914,0xaa98,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0x2aaa};
-    const bigint256 b = {0xc864,0x7710,0x5e9c,0x260b,0x97b4,0x5ed0,0x7b42,0xed09,0xb425,0xd097,0x425e,0x097b,0x25ed,0x97b4,0x5ed0,0x7b42};
+    const bigint256 a = {
+        0xa144,0x4914,0xaa98,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,
+        0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0x2aaa };
+    const bigint256 b = {
+        0xc864,0x7710,0x5e9c,0x260b,0x97b4,0x5ed0,0x7b42,0xed09,
+        0xb425,0xd097,0x425e,0x097b,0x25ed,0x97b4,0x5ed0,0x7b42 };
     int i;
     bigint256 t;
     bigint256 s, u, v, w;
 
     // Write 5 here
-    // Compute s=x^3+ax+b
+    // Compute s = x^3 + ax + b
+    // BIG HINT: Go from left to right, use `s` multiple times to store intermediate values.
 
     
-    // Compute u = (2*s)
+    // Compute u = (2 * s)
 
 
-    // Compute v = u^((p-5)/8)
+    // Compute v = u^((p - 5) / 8)      p = 2^255 - 19
     memcpy(v, u, sizeof(bigint256));
+    // Step 1: figure out what (p - 5) / 8)) looks like in binary representation.
+    // Perform mod_sqr(), mod_mul() a certain number of times in a loop
+    // Process the remaining bits of (p - 5) / 8) manually
+    // (p - 5) / 8 = 250 1's followed by 0 and 1
+    
+    // for(i = 0; i < 249; i++) {
+
+    // }
+
+    // Process the next 0....
+
+    // Process the final 1....
+
+    
+    // Compute w = u * v^2
 
 
-
-
-    // Compute w = u*v^2
-
-
-    // Compute y = s*v*(w-1) = s*v*w - s*v
+    // Compute y = s * v * (w - 1) = s * v * w - s * v
 
 
 }
-
 
 //##########################################
 //# ECDH
@@ -460,18 +537,25 @@ void recover_y(bigint256 y, const bigint256 x) {
 // Generate secret key and public key.
 void keyGen(bigint256 sk, bigint256 pk) {
     // Generator point (Use &G to use it as a pointer, use G.x and G.y to access x and y coordinates)
-    const point G= {
-        .x={0x245a,0xaaad,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0xaaaa,0x2aaa},
-        .y={0x2c14,0x8131,0x3a5d,0xd616,0x9e4d,0x9283,0xb281,0x6dc2,0x2eb3,0x88b7,0x22d3,0x1fe1,0x794b,0x475f,0xe65e,0x5f51}
+    const point G = {       // Static Point
+        .x = {0x245a, 0xaaad, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa,
+              0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0xaaaa, 0x2aaa },
+        .y = {0x2c14,0x8131,0x3a5d,0xd616,0x9e4d,0x9283,0xb281,0x6dc2,
+              0x2eb3,0x88b7,0x22d3,0x1fe1,0x794b,0x475f,0xe65e,0x5f51}
     };
     int i;
 
     // Write 6 here
     // Generate secret key here (first line is given to you)
     RANDOM_DATA(sk, sizeof(bigint256)); // This will read from the file once and fill sk with random data.
-
+    // Same problem as in Assignment 4!!
+    // Copy and Paste your bit set/clear code here
     
     // Generate public key here
+    // m = [sk]G
+    // M.x = public key pk
+
+    // literally one function call to be performed here.
 
 }
 
@@ -483,10 +567,11 @@ void sharedSecret(bigint256 ss, const bigint256 sk, const bigint256 pk) {
     
     // Write 7 here
     // Regenerate y-coordinate of T here
-
+    // Recover y from T
 
     // Compute shared secret here
-    
+    // Use point_mul() to multiply (sk * t) generate shared secret.
+    // ~2 lines of code for this part in total.
 }
 
 int main(int argc, char* argv[]) {

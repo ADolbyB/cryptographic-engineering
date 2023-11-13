@@ -22,9 +22,9 @@
 #define EX1 1
 #define EX2 1
 #define EX3 1
-#define EX4 1           // Takes a long time to run
+#define EX4 0           // Takes a long time to run
 #define EX5 1
-#define EX6 1           // Takes a long time to run
+#define EX6 0           // Takes a long time to run
 #define EX7 1
 
 #define REAL_RANDOM 0   // For Assignment B
@@ -425,13 +425,13 @@ void select_point(point *R, const point *P, const point *Q, uint8_t option) {
     mask = 0 - option;                              // mask is either 0 or 1. if 0, then 0 - option = 11111.... = -1
 
     for(i = 0; i < 16; i++) {                       // One for P(x) and Q(x): loop through each x coord index
-        t = P->x[i] ^ Q->x[i];                      // a[i] XOR b[i]
-        t = mask & t;                               // mask temp variable
-        R->x[i] = P->x[i] ^ t;                      // write to r[i]
+        t = P->x[i] ^ Q->x[i];                      // P.x ^ Q.x
+        t = mask & t;                               // mask is either '0' or all '11111...'
+        R->x[i] = P->x[i] ^ t;                      // P.x ^ 0 = P.x, otherwise P.x ^ (P.x ^ Q.x) = Q.x
 
-        t = P->y[i] ^ Q->y[i];                      // a[i] XOR b[i]
-        t = mask & t;                               // mask temp variable
-        R->y[i] = P->y[i] ^ t;                      // write to r[i]
+        t = P->y[i] ^ Q->y[i];                      // P.y ^ Q.y
+        t = mask & t;                               // mask is either 0 or all '11111...'
+        R->y[i] = P->y[i] ^ t;                      // P.y ^ 0 = P.y, otherwise P.y ^ (P.y ^ Q.y) = Q.y
     }
 
 }
@@ -443,10 +443,7 @@ void point_mul(bigint256 xR, const point *P, const bigint256 s) {
 	point T, T2; // Use &T for pointer. Access coordinates using T.x and T.y
 
     memcpy(&T, P, sizeof(point));
-    
 
-
-    
     // 256-bit numbers: We only process 253 bits.
     // For index 15 only: need to set the MSB (bit 255) to 1.
     // For the MSB in index 15, we only care about 14/16 bits.
@@ -492,40 +489,42 @@ void recover_y(bigint256 y, const bigint256 x) {
     // Write 5 here
     // Compute s = x^3 + ax + b
     // BIG HINT: Go from left to right, use `s` multiple times to store intermediate values.
-    mod_sqr(s, x);              // s = x^2
-    mod_mul(s, s, x);           // s = x^3
-    mod_mul(t, a, x);           // t = ax
-    mod_add(t, t, b);           // t = ax + b
-    mod_add(s, s, t);           // s = s + t == x^3 + ax + b
+    mod_sqr(t, x);                      // t = x^2
+    mod_mul(t, t, x);                   // t = t * x = x^3
+    mod_mul(s, a, x);                   // s = ax
+    mod_add(s, b, s);                   // s = s + b == ax + b
+    mod_add(s, t, s);                   // s = s + t == x^3 + ax + b
     
     // Compute u = (2 * s)
-    mod_add(u, s, s);           // u = 2s
-
+    mod_add(u, s, s);                   // u = 2s
 
     // Compute v = u^((p - 5) / 8)      p = 2^255 - 19
     // Step 1: figure out what (p - 5) / 8)) looks like in binary representation.
     // Perform mod_sqr(), mod_mul() a certain number of times in a loop
     // Process the remaining bits of (p - 5) / 8) manually
     // (p - 5) / 8 = 250 1's followed by 0 and 1
+    memcpy(v, u, sizeof(bigint256));    // v = u
     
     for(i = 0; i < 249; i++) {
-        mod_sqr(v, u);
-        mod_mul(v, v, u);
+        mod_sqr(v, v);                  // v = v^2
+        mod_mul(v, u, v);               // v = u * v = v^2 * v = v^3
     }
 
     // Process the next 0....
-    mod_sqr(t, u);
+    mod_sqr(v, v);
 
     // Process the final 1....
-    mod_sqr(t, u);
-    mod_mul(t, u, t);
-    memcpy(v, u, sizeof(bigint256));
+    mod_sqr(v, v);                      // v = (u^((p - 5) / 8)) - 1
+    mod_mul(v, u, v);                   // v = u^((p - 5) / 8)
 
     // Compute w = u * v^2
-
+    mod_sqr(w, v);                      // w = v^2
+    mod_mul(w, u, w);                   // w = u * w = u * v^2
 
     // Compute y = s * v * (w - 1) = s * v * w - s * v
-
+    mod_mul(s, s, v);                   // s = s * v
+    mod_mul(t, s, w);                   // t = s * w == s * v * w
+    mod_sub(y, t, s);                   // y = t - s == s * v * w - s * v
 
 }
 
@@ -549,6 +548,16 @@ void keyGen(bigint256 sk, bigint256 pk) {
     // Same problem as in Assignment 4!!
     // Copy and Paste your bit set/clear code here
     
+    sk[0] &= 0xFFF8;
+    sk[15] &= 0x7FFF;
+    sk[15] |= 0x4000;
+
+    for(i = 1; i <= 14; i++) {
+        sk[i] &= 0xFFFF;                // Mask to 16 bits
+    }
+
+    point_mul(pk, &G, sk);
+    
     // Generate public key here
     // m = [sk]G
     // M.x = public key pk
@@ -566,6 +575,12 @@ void sharedSecret(bigint256 ss, const bigint256 sk, const bigint256 pk) {
     // Write 7 here
     // Regenerate y-coordinate of T here
     // Recover y from T
+    // recover_y from pk
+
+    recover_y(&T, pk);
+    point_mul(ss, &T.x, sk);
+    
+    // use point_mul to generate shared secret
 
     // Compute shared secret here
     // Use point_mul() to multiply (sk * t) generate shared secret.

@@ -10,3 +10,6 @@
 
 # Named Directories:
 .vscode
+
+# pycache binaries
+__pycache__
